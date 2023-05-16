@@ -34,6 +34,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kapt) apply false
     alias(libs.plugins.dependencycheck) apply false
+    alias(libs.plugins.dependencyanalysis)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.dependencygraph)
@@ -89,6 +90,22 @@ allprojects {
     // Dependency check
     apply {
         plugin("org.owasp.dependencycheck")
+    }
+
+    // Detect unused dependencies
+    apply {
+        plugin("com.autonomousapps.dependency-analysis")
+    }
+}
+
+// See https://github.com/autonomousapps/dependency-analysis-android-gradle-plugin/wiki/Customizing-plugin-behavior
+dependencyAnalysis {
+    issues {
+        all {
+            onUnusedDependencies {
+                exclude("com.jakewharton.timber:timber")
+            }
+        }
     }
 }
 
