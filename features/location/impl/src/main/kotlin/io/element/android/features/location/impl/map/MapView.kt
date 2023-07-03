@@ -16,33 +16,34 @@
 
 package io.element.android.features.location.impl.map
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.view.Gravity
-import androidx.annotation.DrawableRes
+import androidx.annotation.RequiresPermission
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.mapbox.mapboxsdk.Mapbox
 import com.mapbox.mapboxsdk.camera.CameraPosition
-import com.mapbox.mapboxsdk.camera.CameraUpdateFactory
 import com.mapbox.mapboxsdk.geometry.LatLng
+import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions
+import com.mapbox.mapboxsdk.location.LocationComponentOptions
+import com.mapbox.mapboxsdk.location.OnCameraTrackingChangedListener
+import com.mapbox.mapboxsdk.location.engine.LocationEngineRequest
+import com.mapbox.mapboxsdk.location.modes.CameraMode
 import com.mapbox.mapboxsdk.maps.MapView
 import com.mapbox.mapboxsdk.maps.MapboxMap
 import com.mapbox.mapboxsdk.maps.Style
@@ -51,11 +52,11 @@ import com.mapbox.mapboxsdk.plugins.annotation.SymbolOptions
 import com.mapbox.mapboxsdk.style.layers.Property.ICON_ANCHOR_BOTTOM
 import io.element.android.features.location.api.Location
 import io.element.android.features.location.api.internal.buildTileServerUrl
-import io.element.android.libraries.designsystem.preview.ElementPreviewDark
-import io.element.android.libraries.designsystem.preview.ElementPreviewLight
+import io.element.android.libraries.designsystem.preview.DayNightPreviews
+import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.theme.ElementTheme
-import kotlinx.collections.immutable.ImmutableList
+import io.element.android.libraries.theme.compound.generated.SemanticColors
 import kotlinx.collections.immutable.toImmutableList
 import timber.log.Timber
 import kotlin.coroutines.resume
@@ -88,106 +89,41 @@ fun MapView(
         Mapbox.getInstance(context)
         MapView(context)
     }
-    var mapRefs by remember { mutableStateOf<MapRefs?>(null) }
-
-    val attributionColour = ElementTheme.colors.iconPrimary
 
     // Build map
-    LaunchedEffect(darkMode) {
-        mapView.awaitMap().let { map ->
-            map.uiSettings.apply {
-                attributionGravity = Gravity.TOP
-                setAttributionTintColor(attributionColour.toArgb())
-                logoGravity = Gravity.TOP
-                isCompassEnabled = false
-                isRotateGesturesEnabled = false
-            }
-            map.setStyle(buildTileServerUrl(darkMode = darkMode)) { style ->
-                mapRefs = MapRefs(
-                    map = map,
-                    symbolManager = SymbolManager(mapView, map, style).apply {
-                        iconAllowOverlap = true
-                    },
-                    style = style
-                )
-            }
-        }
-    }
-
-    // Update state position when moving map
-    DisposableEffect(mapRefs) {
-        var listener: MapboxMap.OnCameraIdleListener? = null
-
-        mapRefs?.let { mapRefs ->
-            listener = MapboxMap.OnCameraIdleListener {
-                mapRefs.map.cameraPosition.target?.let { target ->
-                    val position = MapState.CameraPosition(
-                        lat = target.latitude,
-                        lon = target.longitude,
-                        zoom = mapRefs.map.cameraPosition.zoom
-                    )
-                    mapState.position = position
-                    Timber.d("Camera moved to: $position")
-                }
-            }.apply {
-                mapRefs.map.addOnCameraIdleListener(this)
-                Timber.d("Added OnCameraIdleListener $this")
-            }
-        }
-
-        onDispose {
-            mapRefs?.let { mapRefs ->
-                listener?.let {
-                    mapRefs.map.removeOnCameraIdleListener(it).apply {
-                        Timber.d("Removed OnCameraIdleListener $it")
-                    }
-                }
-            }
-        }
-    }
-
-    // Move map to given position when state has changed
-    LaunchedEffect(mapRefs, mapState.position) {
-        mapRefs?.map?.moveCamera(
-            CameraUpdateFactory.newCameraPosition(
-                CameraPosition.Builder()
-                    .target(LatLng(mapState.position.lat, mapState.position.lon))
-                    .zoom(mapState.position.zoom).build()
-            )
+    val semanticColors = ElementTheme.colors
+    LaunchedEffect(darkMode, mapState.isLocationEnabled) {
+        mapState.mapRefs = mapView.buildMap(
+            mapState = mapState,
+            darkMode = darkMode,
+            semanticColors = semanticColors,
         )
-        Timber.d("Camera position updated to: ${mapState.position}")
     }
 
-    // Draw pin
-    LaunchedEffect(mapRefs, mapState.location) {
-        mapRefs?.let { mapRefs ->
-            mapState.location?.let { location ->
-                context.getDrawable(DesignSystemR.drawable.pin)?.let { mapRefs.style.addImage("pin", it) }
-                mapRefs.symbolManager.create(
-                    SymbolOptions()
-                        .withLatLng(LatLng(location.lat, location.lon))
-                        .withIconImage("pin")
-                        .withIconSize(1.3f)
-                        .withIconAnchor(ICON_ANCHOR_BOTTOM)
-                )
-                Timber.d("Shown pin at location: $location")
+    key(mapState.mapRefs) {
+        // Enable location
+        LaunchedEffect(mapState.isLocationEnabled) {
+            mapState.mapRefs?.map?.apply {
+                setCameraZoom(15.0)
+                enableLocationComponent(mapState.isLocationEnabled)
             }
         }
 
-    }
-
-    // Draw markers
-    LaunchedEffect(mapRefs, mapState.markers) {
-        mapRefs?.let { mapRefs ->
-            mapState.markers.forEachIndexed { index, marker ->
-                context.getDrawable(marker.drawable)?.let { mapRefs.style.addImage("marker_$index", it) }
-                mapRefs.symbolManager.create(
-                    SymbolOptions()
-                        .withLatLng(LatLng(marker.lat, marker.lon))
-                        .withIconImage("marker_$index")
-                        .withIconSize(1.0f)
-                )
-                Timber.d("Shown marker at location: $marker")
+        // Draw markers
+        LaunchedEffect(mapState.markers) {
+            mapState.mapRefs?.also { (_, style, symbolManager) ->
+                symbolManager.deleteAll()
+                mapState.markers.forEachIndexed { index, marker ->
+                    AppCompatResources.getDrawable(context, marker.drawable)?.let { style.addImage("marker_$index", it) }
+                    symbolManager.create(
+                        SymbolOptions().apply {
+                            withLatLng(LatLng(marker.lat, marker.lon))
+                            withIconImage("marker_$index")
+                            if (marker.anchorBottom) withIconAnchor(ICON_ANCHOR_BOTTOM)
+                        }
+                    )
+                    Timber.d("Showing marker: $marker")
+                }
             }
         }
     }
@@ -199,81 +135,9 @@ fun MapView(
     )
 }
 
+@DayNightPreviews
 @Composable
-fun rememberMapState(
-    position: MapState.CameraPosition = MapState.CameraPosition(lat = 0.0, lon = 0.0, zoom = 0.0),
-    location: Location? = null,
-    markers: ImmutableList<MapState.Marker> = emptyList<MapState.Marker>().toImmutableList(),
-): MapState = remember {
-    MapState(
-        position = position,
-        location = location,
-        markers = markers,
-    )
-} // TODO(Use remember saveable with Parcelable custom saver)
-
-@Stable
-class MapState(
-    position: CameraPosition, // The position of the camera, it's what will be shared
-    location: Location? = null, // The location retrieved by the location subsystem, if any.
-    markers: ImmutableList<Marker> = emptyList<Marker>().toImmutableList(), // The pin's location, if any.
-) {
-    var position: CameraPosition by mutableStateOf(position)
-    var location: Location? by mutableStateOf(location)
-    var markers: ImmutableList<Marker> by mutableStateOf(markers)
-
-    override fun toString(): String {
-        return "MapState(position=$position, location=$location, markers=$markers)"
-    }
-
-    @Stable
-    data class CameraPosition(
-        val lat: Double,
-        val lon: Double,
-        val zoom: Double,
-    )
-
-    @Stable
-    data class Marker(
-        @DrawableRes val drawable: Int,
-        val lat: Double,
-        val lon: Double,
-    )
-}
-
-private class MapRefs(
-    val map: MapboxMap,
-    val symbolManager: SymbolManager,
-    val style: Style
-)
-
-/**
- * A suspending function that provides an instance of [MapboxMap] from this [MapView]. This is
- * an alternative to [MapView.getMapAsync] by using coroutines to obtain the [MapboxMap].
- *
- * Inspired from [com.google.maps.android.ktx.awaitMap]
- *
- * @return the [MapboxMap] instance
- */
-private suspend inline fun MapView.awaitMap(): MapboxMap =
-    suspendCoroutine { continuation ->
-        getMapAsync {
-            continuation.resume(it)
-        }
-    }
-
-@Preview
-@Composable
-fun MapViewLightPreview() =
-    ElementPreviewLight { ContentToPreview() }
-
-@Preview
-@Composable
-fun MapViewDarkPreview() =
-    ElementPreviewDark { ContentToPreview() }
-
-@Composable
-private fun ContentToPreview() {
+fun MapViewPreview() = ElementPreview {
     MapView(
         modifier = Modifier.size(400.dp),
         mapState = rememberMapState(
@@ -297,3 +161,121 @@ private fun ContentToPreview() {
         ),
     )
 }
+
+private suspend inline fun MapView.buildMap(
+    mapState: MapState,
+    darkMode: Boolean,
+    semanticColors: SemanticColors,
+): MapState.MapRefs {
+    val map = awaitMap()
+    val style = map.awaitStyle(buildTileServerUrl(darkMode = darkMode))
+    val symbolManager = SymbolManager(this, map, style).apply {
+        iconAllowOverlap = true
+    }
+    map.uiSettings.apply {
+        attributionGravity = Gravity.TOP
+        setAttributionTintColor(semanticColors.iconPrimary.toArgb())
+        logoGravity = Gravity.TOP
+        isCompassEnabled = false
+        isRotateGesturesEnabled = false
+    }
+    map.locationComponent.activateLocationComponent(
+        LocationComponentActivationOptions.Builder(context, style)
+            .locationComponentOptions(
+                LocationComponentOptions.builder(context)
+                    .pulseEnabled(true)
+                    .build()
+            )
+            .locationEngineRequest(
+                LocationEngineRequest.Builder(750)
+                    .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
+                    .setFastestInterval(750)
+                    .build()
+            )
+            .build()
+    )
+
+    map.setCameraPosition(mapState.position)
+    map.addOnCameraIdleListener {
+        val cameraPosition = map.cameraPosition.target?.let {
+            MapState.CameraPosition(
+                lat = it.latitude,
+                lon = it.longitude,
+                zoom = map.cameraPosition.zoom
+            )
+        }
+        val location = map.locationComponent.lastKnownLocation?.let {
+            Location(
+                lat = it.latitude,
+                lon = it.longitude,
+                accuracy = it.accuracy
+            )
+        }
+        cameraPosition?.let { mapState.rawPosition = it }
+        location?.let { mapState.location = it }
+        Timber.d("Camera now idle at position: $cameraPosition - location: $location")
+    }
+
+    map.enableTrackingCameraMode(mapState.isTrackingLocation)
+    map.locationComponent.addOnCameraTrackingChangedListener(object : OnCameraTrackingChangedListener {
+        override fun onCameraTrackingDismissed() {}
+
+        override fun onCameraTrackingChanged(currentMode: Int) {
+            mapState.rawIsTrackingLocation = when (currentMode) {
+                CameraMode.NONE -> false
+                CameraMode.TRACKING -> true
+                else -> error("Illegal camera mode: $currentMode")
+            }
+            Timber.d("onCameraTrackingChanged: $currentMode")
+        }
+    })
+
+    return MapState.MapRefs(
+        map = map,
+        style = style,
+        symbolManager = symbolManager,
+    )
+}
+
+private suspend inline fun MapView.awaitMap(): MapboxMap = suspendCoroutine {
+    getMapAsync { map ->
+        it.resume(map)
+    }
+}
+
+private suspend inline fun MapboxMap.awaitStyle(url: String): Style = suspendCoroutine {
+    setStyle(url) { style ->
+        it.resume(style)
+    }
+}
+
+internal fun MapboxMap.setCameraPosition(position: MapState.CameraPosition) {
+    cameraPosition = CameraPosition.Builder()
+        .target(LatLng(position.lat, position.lon))
+        .zoom(position.zoom)
+        .build()
+    Timber.d("Camera position set to: $position")
+}
+
+private fun MapboxMap.setCameraZoom(zoom: Double) {
+    cameraPosition = CameraPosition.Builder()
+        .zoom(zoom)
+        .build()
+    Timber.d("Camera zoom set to: $zoom")
+}
+
+@RequiresPermission(anyOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+private fun MapboxMap.enableLocationComponent(enabled: Boolean) {
+    locationComponent.apply {
+        isLocationComponentEnabled = enabled
+        Timber.d("Location component enabled: $enabled")
+    }
+}
+
+internal fun MapboxMap.enableTrackingCameraMode(enabled: Boolean) {
+    locationComponent.apply {
+        cameraMode = if (enabled) CameraMode.TRACKING else CameraMode.NONE
+        Timber.d("Tracking location enabled: $enabled")
+    }
+}
+

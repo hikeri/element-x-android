@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.element.android.features.location.impl
+package io.element.android.features.location.impl.send
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

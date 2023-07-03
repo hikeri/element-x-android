@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-package io.element.android.features.location.impl
+package io.element.android.features.location.impl.send
 
 import app.cash.molecule.RecompositionClock
 import app.cash.molecule.moleculeFlow
 import app.cash.turbine.test
 import com.google.common.truth.Truth
+import io.element.android.features.location.impl.send.SendLocationEvents
+import io.element.android.features.location.impl.send.SendLocationPresenter
+import io.element.android.features.location.impl.send.SendLocationState
 import io.element.android.libraries.matrix.test.room.FakeMatrixRoom
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -35,7 +38,7 @@ class SendLocationPresenterTest {
         moleculeFlow(RecompositionClock.Immediate) {
             presenter.present()
         }.test {
-            Truth.assertThat(awaitItem().mode).isEqualTo(SendLocationState.Mode.ALocation)
+            Truth.assertThat(awaitItem().mode).isEqualTo(SendLocationState.Mode.PinLocation)
         }
     }
 
@@ -57,8 +60,8 @@ class SendLocationPresenterTest {
             presenter.present()
         }.test {
             val initialState = awaitItem()
-            initialState.eventSink(SendLocationEvents.SwitchMode(SendLocationState.Mode.MyLocation))
-            Truth.assertThat(awaitItem().mode).isEqualTo(SendLocationState.Mode.MyLocation)
+            initialState.eventSink(SendLocationEvents.SwitchMode(SendLocationState.Mode.SenderLocation))
+            Truth.assertThat(awaitItem().mode).isEqualTo(SendLocationState.Mode.SenderLocation)
         }
     }
 }

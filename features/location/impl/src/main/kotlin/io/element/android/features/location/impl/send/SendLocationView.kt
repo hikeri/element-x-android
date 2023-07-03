@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.element.android.features.location.impl
+package io.element.android.features.location.impl.send
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -25,49 +25,104 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.LocationSearching
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import io.element.android.features.location.impl.map.MapState
 import io.element.android.features.location.impl.map.MapView
 import io.element.android.features.location.impl.map.rememberMapState
 import io.element.android.libraries.designsystem.components.button.BackButton
-import io.element.android.libraries.designsystem.preview.ElementPreviewDark
-import io.element.android.libraries.designsystem.preview.ElementPreviewLight
+import io.element.android.libraries.designsystem.preview.DayNightPreviews
+import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.theme.components.BottomSheetScaffold
 import io.element.android.libraries.designsystem.theme.components.CenterAlignedTopAppBar
+import io.element.android.libraries.designsystem.theme.components.FloatingActionButton
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.libraries.designsystem.R as DesignSystemR
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalPermissionsApi::class,
+)
 @Composable
 fun SendLocationView(
     state: SendLocationState,
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit = {},
 ) {
-    val mapState = rememberMapState()
+    val permissionState = rememberMultiplePermissionsState(
+        permissions = listOf(
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+        )
+    )
+    val anyPermissionsGranted: Boolean by remember {
+        derivedStateOf { permissionState.permissions.any { it.status.isGranted } }
+    }
+    val mapState = if (anyPermissionsGranted) {
+        rememberMapState(
+            isLocationEnabled = true,
+            isTrackingLocation = true,
+        )
+    } else {
+        rememberMapState(
+            position = MapState.CameraPosition(49.843, 9.902056, 2.7),
+            isLocationEnabled = false,
+            isTrackingLocation = false,
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        permissionState.launchMultiplePermissionRequest()
+    }
+
     BottomSheetScaffold(
         sheetContent = {
+            if (!anyPermissionsGranted) {
+                Spacer(modifier = Modifier.height(16.dp))
+                if (permissionState.shouldShowRationale) {
+                    PermissionRationaleBanner { permissionState.launchMultiplePermissionRequest() }
+                } else {
+                    PermissionDeniedBanner { /* TODO Go to settings */ }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             ListItem(
                 headlineContent = {
-                    Text(stringResource(CommonStrings.screen_share_this_location_action))
+                    Text(
+                        stringResource(
+                            when (mapState.isTrackingLocation) {
+                                true -> CommonStrings.screen_share_my_location_action
+                                false -> CommonStrings.screen_share_this_location_action
+                            }
+                        )
+                    )
                 },
                 modifier = Modifier.clickable {
                     state.eventSink(
@@ -126,24 +181,58 @@ fun SendLocationView(
                     )
                 }
             )
+            FloatingActionButton(
+                onClick = { mapState.isTrackingLocation = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 64.dp),
+            ) {
+                when (mapState.isTrackingLocation) {
+                    false -> Icon(imageVector = Icons.Default.LocationSearching, contentDescription = null)
+                    true -> Icon(imageVector = Icons.Default.MyLocation, contentDescription = null)
+                }
+            }
         }
     }
 }
 
-@Preview
+@DayNightPreviews
 @Composable
-internal fun SendLocationViewLightPreview(@PreviewParameter(SendLocationStateProvider::class) state: SendLocationState) =
-    ElementPreviewLight { ContentToPreview(state) }
-
-@Preview
-@Composable
-internal fun SendLocationViewDarkPreview(@PreviewParameter(SendLocationStateProvider::class) state: SendLocationState) =
-    ElementPreviewDark { ContentToPreview(state) }
-
-@Composable
-private fun ContentToPreview(state: SendLocationState) {
+fun SendLocationViewPreview(
+    @PreviewParameter(SendLocationStateProvider::class) state: SendLocationState
+) = ElementPreview {
     SendLocationView(
         state = state,
         onBackPressed = {},
+    )
+}
+
+@Composable
+private fun PermissionRationaleBanner(
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text("No location permission, click to request.")
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = {
+            Icon(Icons.Default.LocationOff, null)
+        },
+    )
+}
+
+@Composable
+private fun PermissionDeniedBanner(
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text("No location permission, click to go to settings.")
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = {
+            Icon(Icons.Default.LocationOff, null)
+        },
     )
 }

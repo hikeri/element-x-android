@@ -39,6 +39,7 @@ dependencies {
     implementation(projects.services.analytics.api)
     implementation(libs.maplibre)
     implementation(libs.maplibre.annotation)
+    implementation(libs.accompanist.permission)
     implementation(projects.libraries.uiStrings)
     implementation(libs.dagger)
     implementation(projects.anvilannotations)

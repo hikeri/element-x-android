@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package io.element.android.features.location.impl
+package io.element.android.features.location.impl.send
 
-import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-
-class SendLocationStateProvider : PreviewParameterProvider<SendLocationState> {
-    override val values: Sequence<SendLocationState>
-        get() = sequenceOf(
-            SendLocationState(),
-        )
+data class SendLocationState(
+    val mode: Mode,
+    val eventSink: (SendLocationEvents) -> Unit = {},
+) {
+    sealed interface Mode {
+        object SenderLocation : Mode
+        object PinLocation : Mode
+    }
 }

@@ -14,9 +14,13 @@
  * limitations under the License.
  */
 
-package io.element.android.features.location.impl
+package io.element.android.features.location.impl.send
 
-sealed interface SendLocationEvents {
-    data class ShareLocation(val lat: Double, val lng: Double) : SendLocationEvents
-    data class SwitchMode(val mode: SendLocationState.Mode) : SendLocationEvents
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+
+class SendLocationStateProvider : PreviewParameterProvider<SendLocationState> {
+    override val values: Sequence<SendLocationState>
+        get() = sequenceOf(
+            SendLocationState(SendLocationState.Mode.SenderLocation),
+        )
 }

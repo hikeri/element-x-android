@@ -46,6 +46,8 @@ import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.theme.compound.generated.TypographyTokens
 import io.element.android.libraries.ui.strings.CommonStrings
+import kotlinx.collections.immutable.toImmutableList
+import io.element.android.libraries.designsystem.R as DesignSystemR
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +57,14 @@ fun ShowLocationView(
     onBackPressed: () -> Unit = {},
 ) {
     val mapState = rememberMapState(
-        location = state.location,
+        markers = listOf(
+            MapState.Marker(
+                drawable = DesignSystemR.drawable.pin,
+                lat = state.location.lat,
+                lon = state.location.lon,
+                anchorBottom = true,
+            )
+        ).toImmutableList(),
         position = MapState.CameraPosition(state.location.lat, state.location.lon, 15.0),
     )
 

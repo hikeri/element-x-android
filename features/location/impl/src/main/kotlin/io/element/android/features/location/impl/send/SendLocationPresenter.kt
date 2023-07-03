@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.element.android.features.location.impl
+package io.element.android.features.location.impl.send
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,13 +37,13 @@ class SendLocationPresenter @Inject constructor(
         val scope = rememberCoroutineScope()
 
         var mode by remember {
-            mutableStateOf<SendLocationState.Mode>(SendLocationState.Mode.ALocation)
+            mutableStateOf<SendLocationState.Mode>(SendLocationState.Mode.SenderLocation)
         }
 
         fun handleEvents(event: SendLocationEvents) {
             when (event) {
                 is SendLocationEvents.ShareLocation -> scope.launch {
-                    shareLocation(event)
+                    shareLocation(event, mode)
                 }
                 is SendLocationEvents.SwitchMode -> {
                     mode = event.mode
@@ -58,14 +58,18 @@ class SendLocationPresenter @Inject constructor(
     }
 
     private suspend fun shareLocation(
-        event: SendLocationEvents.ShareLocation
+        event: SendLocationEvents.ShareLocation,
+        mode: SendLocationState.Mode,
     ) {
         room.sendLocation(
             body = "Location at latitude: ${event.lat}, longitude: ${event.lng}",
             geoUri = "geo:${event.lat},${event.lng}",
             description = null,
             zoomLevel = 15, // Send default zoom level for now.
-            assetType = AssetType.PIN,
+            assetType = when (mode) {
+                SendLocationState.Mode.PinLocation -> AssetType.PIN
+                SendLocationState.Mode.SenderLocation -> AssetType.SENDER
+            }
         )
     }
 }
