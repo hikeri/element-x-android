@@ -30,6 +30,7 @@ anvil {
 
 dependencies {
     api(projects.features.location.api)
+    implementation(projects.libraries.maplibreCompose)
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.matrix.api)
     implementation(projects.libraries.di)

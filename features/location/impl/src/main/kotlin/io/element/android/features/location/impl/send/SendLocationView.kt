@@ -85,21 +85,26 @@ fun SendLocationView(
     val anyPermissionsGranted: Boolean by remember {
         derivedStateOf { permissionState.permissions.any { it.status.isGranted } }
     }
-    val mapState = if (anyPermissionsGranted) {
-        rememberMapState(
-            isLocationEnabled = true,
-            isTrackingLocation = true,
-        )
-    } else {
-        rememberMapState(
-            position = MapState.CameraPosition(49.843, 9.902056, 2.7),
-            isLocationEnabled = false,
-            isTrackingLocation = false,
-        )
-    }
-
     LaunchedEffect(Unit) {
         permissionState.launchMultiplePermissionRequest()
+    }
+
+    val mapState = rememberMapState(
+        position = if (anyPermissionsGranted) {
+            MapState.CameraPosition(0.0, 0.0, 0.0)
+        } else {
+            MapState.CameraPosition(49.843, 9.902056, 2.7)
+        },
+        isLocationEnabled = anyPermissionsGranted,
+        isTrackingLocation = true
+    )
+    
+    LaunchedEffect(mapState.isTrackingLocation) {
+        if (mapState.isTrackingLocation) {
+            state.eventSink(SendLocationEvents.SwitchMode(SendLocationState.Mode.SenderLocation))
+        } else {
+            state.eventSink(SendLocationEvents.SwitchMode(SendLocationState.Mode.PinLocation))
+        }
     }
 
     BottomSheetScaffold(
@@ -117,9 +122,9 @@ fun SendLocationView(
                 headlineContent = {
                     Text(
                         stringResource(
-                            when (mapState.isTrackingLocation) {
-                                true -> CommonStrings.screen_share_my_location_action
-                                false -> CommonStrings.screen_share_this_location_action
+                            when (state.mode) {
+                                SendLocationState.Mode.SenderLocation -> CommonStrings.screen_share_my_location_action
+                                SendLocationState.Mode.PinLocation -> CommonStrings.screen_share_this_location_action
                             }
                         )
                     )
@@ -182,14 +187,14 @@ fun SendLocationView(
                 }
             )
             FloatingActionButton(
-                onClick = { mapState.isTrackingLocation = true },
+                onClick = { state.eventSink(SendLocationEvents.SwitchMode(SendLocationState.Mode.SenderLocation)) },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 16.dp, bottom = 64.dp),
             ) {
-                when (mapState.isTrackingLocation) {
-                    false -> Icon(imageVector = Icons.Default.LocationSearching, contentDescription = null)
-                    true -> Icon(imageVector = Icons.Default.MyLocation, contentDescription = null)
+                when (state.mode) {
+                    SendLocationState.Mode.PinLocation -> Icon(imageVector = Icons.Default.LocationSearching, contentDescription = null)
+                    SendLocationState.Mode.SenderLocation -> Icon(imageVector = Icons.Default.MyLocation, contentDescription = null)
                 }
             }
         }

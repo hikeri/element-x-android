@@ -16,6 +16,7 @@
 
 package io.element.android.features.location.impl.show
 
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -26,15 +27,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import com.mapbox.mapboxsdk.camera.CameraPosition
+import com.mapbox.mapboxsdk.geometry.LatLng
+import io.element.android.features.location.api.internal.buildTileServerUrl
 import io.element.android.features.location.impl.map.MapState
-import io.element.android.features.location.impl.map.MapView
 import io.element.android.features.location.impl.map.rememberMapState
 import io.element.android.libraries.designsystem.components.button.BackButton
 import io.element.android.libraries.designsystem.preview.ElementPreviewDark
@@ -44,6 +49,11 @@ import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.IconButton
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.Text
+import io.element.android.libraries.maplibre.compose.MapboxMap
+import io.element.android.libraries.maplibre.compose.Symbol
+import io.element.android.libraries.maplibre.compose.rememberCameraPositionState
+import io.element.android.libraries.maplibre.compose.rememberSymbolState
+import io.element.android.libraries.theme.ElementTheme
 import io.element.android.libraries.theme.compound.generated.TypographyTokens
 import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.collections.immutable.toImmutableList
@@ -107,10 +117,30 @@ fun ShowLocationView(
                 )
             }
 
-            MapView(
-                mapState = mapState,
+            // MapView(
+            //     mapState = mapState,
+            //     modifier = Modifier.fillMaxSize(),
+            // )
+            val cameraPositionState = rememberCameraPositionState {
+                position = CameraPosition.Builder()
+                    .target(LatLng(state.location.lat, state.location.lon))
+                    .zoom(15.0)
+                    .build()
+            }
+            val darkMode = !ElementTheme.isLightTheme
+            val styleUrl = remember(darkMode) { buildTileServerUrl(darkMode = darkMode) }
+            MapboxMap(
+                styleUrl = styleUrl,
                 modifier = Modifier.fillMaxSize(),
-            )
+                cameraPositionState = cameraPositionState,
+            ) {
+                Symbol(
+                    state = rememberSymbolState(
+                        position = LatLng(state.location.lat, state.location.lon)
+                    ),
+                    icon = AppCompatResources.getDrawable(LocalContext.current, DesignSystemR.drawable.pin)!!,
+                )
+            }
         }
     }
 }
