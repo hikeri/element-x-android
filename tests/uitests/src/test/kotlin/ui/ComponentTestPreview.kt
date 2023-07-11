@@ -28,4 +28,8 @@ class ComponentTestPreview(
     override val name: String = showkaseBrowserComponent.componentName
 
     override fun toString(): String = showkaseBrowserComponent.componentKey
+        // Strip package (Preview MUST all have a distinct name)
+        .substringAfter("_")
+        // Strip default group (if present)
+        .substringAfter("DefaultGroup_")
 }
