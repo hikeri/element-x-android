@@ -80,6 +80,8 @@ naming:
   FunctionNaming:
     active: true
     ignoreAnnotated: ['Composable']
+  MemberNameEqualsClassName:
+    active: false
 
 performance:
   SpreadOperator:
