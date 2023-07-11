@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package io.element.android.tests.uitests
+package ui
 
 import android.content.res.Configuration
 import android.os.LocaleList
@@ -55,7 +55,7 @@ import java.util.Locale
  * my own needs for this sample.
  */
 @RunWith(TestParameterInjector::class)
-class ScreenshotTest {
+class T {
 
     object PreviewProvider : TestParameter.TestParameterValuesProvider {
         override fun provideValues(): List<TestPreview> {
@@ -75,7 +75,7 @@ class ScreenshotTest {
     )
 
     @Test
-    fun preview_tests(
+    fun t(
         @TestParameter(valuesProvider = PreviewProvider::class) componentTestPreview: TestPreview,
         @TestParameter baseDeviceConfig: BaseDeviceConfig,
         @TestParameter(value = ["1.0"/*, "1.5"*/]) fontScale: Float,

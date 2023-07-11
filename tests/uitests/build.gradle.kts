@@ -25,7 +25,8 @@ plugins {
 }
 
 android {
-    namespace = "io.element.android.tests.uitests"
+    // Keep it as short as possible
+    namespace = "ui"
 }
 
 dependencies {
